@@ -26,8 +26,11 @@ class DX3Controller(Node):
         super().__init__('dx3_hand_controller')
         self.declare_parameter("interface", "")
         self.declare_parameter("arm_controlled", "both")
+        self.declare_parameter("use_robot", True)
         interface = self.get_parameter("interface").get_parameter_value().string_value
         arm_controlled = self.get_parameter("arm_controlled").get_parameter_value().string_value
+        self.use_robot = self.get_parameter("use_robot").get_parameter_value().bool_value
+
         self.left_gripper_state_publisher = self.create_publisher(MotorStateList, 'g1pilot/dx3/left/motor_state', QoSProfile(depth=10))
         self.right_gripper_state_publisher = self.create_publisher(MotorStateList, 'g1pilot/dx3/right/motor_state', QoSProfile(depth=10))
 
@@ -38,20 +41,25 @@ class DX3Controller(Node):
         self.total_motors = 7
         self.send_commands = True
 
-        ChannelFactoryInitialize(0, interface)
+        if self.use_robot:
+            ChannelFactoryInitialize(0, interface)
+        else:
+            self.get_logger().info("use_robot:=false -> Not connecting to real hands.")
 
         if arm_controlled in ["right", "both"]:
-            self.right_pub = ChannelPublisher("rt/dex3/right/cmd", HandCmd_)
-            self.right_pub.Init()
-            self.right_sub = ChannelSubscriber("rt/dex3/right/state", HandState_)
-            self.right_sub.Init(self.right_callback)
+            if self.use_robot:
+                self.right_pub = ChannelPublisher("rt/dex3/right/cmd", HandCmd_)
+                self.right_pub.Init()
+                self.right_sub = ChannelSubscriber("rt/dex3/right/state", HandState_)
+                self.right_sub.Init(self.right_callback)
             self.create_subscription(PointStamped, "/g1pilot/right_hand/dx3/action", self.right_action_callback, 10)
 
         if arm_controlled in ["left", "both"]:
-            self.left_pub = ChannelPublisher("rt/dex3/left/cmd", HandCmd_)
-            self.left_pub.Init()
-            self.left_sub = ChannelSubscriber("rt/dex3/left/state", HandState_)
-            self.left_sub.Init(self.left_callback)
+            if self.use_robot:
+                self.left_pub = ChannelPublisher("rt/dex3/left/cmd", HandCmd_)
+                self.left_pub.Init()
+                self.left_sub = ChannelSubscriber("rt/dex3/left/state", HandState_)
+                self.left_sub.Init(self.left_callback)
             self.create_subscription(PointStamped, "/g1pilot/left_hand/dx3/action", self.left_action_callback, 10)
 
         self.create_timer(0.05, self.publish_commands)

@@ -6,6 +6,8 @@ docker run \
         --env="DISPLAY" \
         --env="QT_X11_NO_MITSHM=0" \
         --env="ROS_DOMAIN_ID=1" \
+        --env="RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" \
+        --env="G1_INTERFACE=${G1_INTERFACE:-enp8s0}" \
         --net host \
         --privileged \
         --device-cgroup-rule='c 81:* rmw' \

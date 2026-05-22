@@ -53,6 +53,7 @@ def generate_launch_description():
                 'use_robot': ParameterValue(use_robot, value_type=bool),
                 'sim_rate_hz': ParameterValue(sim_rate_hz, value_type=float),
                 'publish_joint_states': ParameterValue(publish_joint_states, value_type=bool),
+                "use_sim_time": ParameterValue(use_sim_time, value_type=bool),
             }],
             output='screen'
         ),
@@ -62,6 +63,7 @@ def generate_launch_description():
             executable='mola_fixed',
             name='mola_fixed',
             parameters=[{
+                "use_sim_time": ParameterValue(use_sim_time, value_type=bool),
             }],
             output='screen'
         ),
@@ -70,14 +72,16 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='mid360_to_livox_tf',
-            arguments=['0','0','0','0','0','3.14159265','mid360_link','livox_frame']
+            arguments=['0','0','0','0','0','3.14159265','mid360_link','livox_frame'],
+            parameters=[{'use_sim_time': use_sim_time}]
         ),
 
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
             name='pelvis_to_base_link_tf',
-            arguments=['0','0','0','0','0','0','base_link','pelvis']
+            arguments=['0','0','0','0','0','0','base_link','pelvis'],
+            parameters=[{'use_sim_time': use_sim_time}]
         ),
 
         Node(
@@ -100,5 +104,6 @@ def generate_launch_description():
                 "-d",
                 os.path.join("/ros2_ws/src/g1pilot/config", rviz_config_file_name)
             ],
+            parameters=[{"use_sim_time": ParameterValue(use_sim_time, value_type=bool)}],
         ),
     ])

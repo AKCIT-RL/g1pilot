@@ -29,6 +29,7 @@ setup(
 
             'launch/bringup_launcher.launch.py',
             'launch/bringup_opensot.launch.py',
+            'launch/mission_launcher.launch.py',
         ]),
 
         # URDF / XML
@@ -46,6 +47,10 @@ setup(
         # Configuration Files
         (f'share/{package_name}/config',
             expand(['config/*.yaml'])),
+
+        # Pipelines
+        (f'share/{package_name}/pipelines',
+            expand(['pipelines/*.yaml'])),
 
         # RViz
         (f'share/{package_name}/rviz', expand(['rviz/*.rviz'])),
@@ -78,6 +83,7 @@ setup(
             'nav2point = g1pilot.navigation.nav2point:main',
             'create_map = g1pilot.navigation.create_map:main',
             'mola_fixed = g1pilot.navigation.fix_mola_odometry:main',
+            'pcl_to_grid = g1pilot.navigation.pcl_to_grid:main',
         ],
     },
 )

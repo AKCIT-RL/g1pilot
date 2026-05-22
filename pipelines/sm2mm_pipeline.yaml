@@ -1,0 +1,50 @@
+generators:
+  # Create the output metric map (HashedVoxelPointCloud) without processing observations
+  - class_name: mp2p_icp_filters::Generator
+    params:
+      target_layer: "localmap"
+      process_class_names_regex: ""   # empty = don't process any observations here
+      process_sensor_labels_regex: ""
+      throw_on_unhandled_observation_class: false
+
+      metric_map_definition:
+        class: mola::HashedVoxelPointCloud
+        plugin: "libmola_metric_maps.so"
+        creationOpts:
+          voxel_size: 0.5
+        insertOpts:
+          max_points_per_voxel: 20
+          min_distance_between_points: 0
+        likelihoodOpts:
+          sigma_dist: 1.0
+          max_corr_distance: 2.0
+          decimation: 10
+
+  # Load all observations into a plain point cloud layer "raw"
+  - class_name: mp2p_icp_filters::Generator
+    params:
+      target_layer: "raw"
+      process_class_names_regex: ".*"
+      process_sensor_labels_regex: ".*"
+      throw_on_unhandled_observation_class: false
+
+filters:
+  # Decimate the raw point cloud
+  - class_name: mp2p_icp_filters::FilterDecimateVoxels
+    params:
+      input_pointcloud_layer: "raw"
+      output_pointcloud_layer: "decimated"
+      voxel_filter_resolution: 0.20
+      decimate_method: DecimateMethod::FirstPoint
+
+  # Merge decimated points into the voxel localmap
+  - class_name: mp2p_icp_filters::FilterMerge
+    params:
+      input_pointcloud_layer: "decimated"
+      target_layer: "localmap"
+      input_layer_in_local_coordinates: true
+
+  # Remove intermediate layers to avoid collisions
+  - class_name: mp2p_icp_filters::FilterDeleteLayer
+    params:
+      pointcloud_layer_to_remove: ["raw", "decimated"]

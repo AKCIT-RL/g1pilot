@@ -22,7 +22,7 @@ RUN python3 -m venv /home/.base
 RUN echo "source /home/.base/bin/activate" >> ~/.bashrc
 SHELL ["bash", "-ic"]
 
-RUN pip install --upgrade ttictoc setuptools hhcm-forest && forest init
+RUN pip install --upgrade ttictoc "setuptools<70" hhcm-forest && forest init
 RUN echo "source $PWD/setup.bash" >> ~/.bashrc
 SHELL ["bash", "-ic"]
 
@@ -247,10 +247,8 @@ RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \
 
 RUN echo "export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH" >> /root/.bashrc
 
-RUN echo "export ROS_DOMAIN_ID=1" >> /root/.bashrc
-
 # Also install in the venv, because rosidl_adapter may run with /home/.base/bin/python3
-RUN /home/.base/bin/pip install -U pip setuptools wheel && \
+RUN /home/.base/bin/pip install -U pip "setuptools<70" wheel && \
     /home/.base/bin/pip install empy lark catkin_pkg mujoco robot_descriptions playground pyqt6 && \
     /home/.base/bin/pip install pygame numpy pin meshcat placo pin-pink pyspacemouse && \
     /home/.base/bin/pip install git+https://github.com/bglopez/python-easyhid.git && \
@@ -263,9 +261,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-empy \
     python3-lark \
     python3-catkin-pkg \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
-RUN /home/.base/bin/pip install -U pip setuptools wheel && \
+RUN /home/.base/bin/pip install -U pip "setuptools<70" wheel && \
     /home/.base/bin/pip install -U colcon-common-extensions && \
     /home/.base/bin/pip install hidapi pyspacemouse
 
@@ -308,13 +306,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libhidapi-libusb0 \
     libusb-1.0-0 \
     libhidapi-dev \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
     ros-${ROS_DISTRO}-cyclonedds \
     iproute2 \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 RUN echo "rosenv 2>/dev/null || true" >> /root/.bashrc
 
@@ -327,12 +325,13 @@ RUN echo "export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH" >> /root/.bas
 
 WORKDIR /
 RUN git clone https://github.com/lnotspotl/unitree_sdk2_python.git \
- && cd unitree_sdk2_python \
- && git checkout 7c661d27f4ae064ffd0dd633fd9d5b518ef0b508 \
- && /home/.base/bin/pip install -e .
+    && cd unitree_sdk2_python \
+    && git checkout 7c661d27f4ae064ffd0dd633fd9d5b518ef0b508 \
+    && /home/.base/bin/pip install -e .
 
 WORKDIR /ros2_ws/src
-RUN git clone https://github.com/Livox-SDK/livox_ros_driver2.git /ros2_ws/src/livox_ros_driver2
+RUN git clone https://github.com/Livox-SDK/livox_ros_driver2.git /ros2_ws/src/livox_ros_driver2 && \
+    git clone https://github.com/CDonosoK/astroviz_interfaces.git
 
 WORKDIR /
 RUN git clone https://github.com/Livox-SDK/Livox-SDK2.git && \
@@ -386,23 +385,21 @@ RUN apt install ros-${ROS_DISTRO}-rosidl-default-generators -y
 
 RUN apt update
 RUN apt install ros-${ROS_DISTRO}-rmw-cyclonedds-cpp -y
-WORKDIR /ros2_ws/src
-RUN git clone https://github.com/CDonosoK/astroviz_interfaces.git
 RUN apt-get update && apt-get upgrade -y
 RUN apt install -y python3-gi gstreamer1.0-tools \
-  gstreamer1.0-plugins-* gstreamer1.0-libav
+    gstreamer1.0-plugins-* gstreamer1.0-libav
 
 RUN pip install --upgrade pyrealsense2 numpy opencv-python
 
 ##### MOLA packages
 RUN apt install -y \
- ros-${ROS_DISTRO}-mola \
- ros-${ROS_DISTRO}-mola-state-estimation \
- ros-${ROS_DISTRO}-mola-lidar-odometry
+    ros-${ROS_DISTRO}-mola \
+    ros-${ROS_DISTRO}-mola-state-estimation \
+    ros-${ROS_DISTRO}-mola-lidar-odometry
 
 RUN pip install placo
 
-RUN python3 -m pip install --no-cache-dir -U pip setuptools wheel && \
+RUN python3 -m pip install --no-cache-dir -U pip "setuptools<70" wheel && \
     python3 -m pip install --no-cache-dir cyclonedds
 RUN /home/.base/bin/pip install --no-cache-dir cyclonedds
 
@@ -413,7 +410,7 @@ RUN set -eux; \
     mkdir -p "$CRC_DST"; \
     cp "$CRC_SRC" "$CRC_DST/"; \
     chmod +x "$CRC_DST/crc_amd64.so"
-    
+
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \
     echo "source /ros2_ws/install/setup.bash" >> /root/.bashrc
 

@@ -12,6 +12,7 @@ def generate_launch_description():
                  "Set it to your network interface, e.g.: export G1_INTERFACE=eno2")
     interface = LaunchConfiguration("interface")
     use_robot = LaunchConfiguration("use_robot")
+    use_sim_time = LaunchConfiguration("use_sim_time")
     arm_controlled = LaunchConfiguration("arm_controlled")
     enable_arm_ui = LaunchConfiguration("enable_arm_ui")
     ik_use_waist = LaunchConfiguration("ik_use_waist")
@@ -25,6 +26,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("interface", default_value=EnvironmentVariable("G1_INTERFACE")),
         DeclareLaunchArgument("use_robot", default_value="true"),
+        DeclareLaunchArgument("use_sim_time", default_value="false"),
         DeclareLaunchArgument("arm_controlled", default_value="both"),
         DeclareLaunchArgument("enable_arm_ui", default_value="true"),
         DeclareLaunchArgument("ik_use_waist", default_value="false"),
@@ -45,6 +47,7 @@ def generate_launch_description():
                 'enable_collision_avoidance': ParameterValue(enable_collision_avoidance, value_type=bool),
                 'send_cmds_to_robot': ParameterValue(send_cmds_to_robot, value_type=bool),
                 'publish_joint_states_opensot': ParameterValue(publish_joint_states_opensot, value_type=bool),
+                'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
             }],
             output='screen'
         ),
@@ -55,7 +58,9 @@ def generate_launch_description():
             name='dx3_controller',
             parameters=[{
                 'arm_controlled': ParameterValue(LaunchConfiguration("arm_controlled"), value_type=str),
-                'interface': ParameterValue(LaunchConfiguration("interface"), value_type=str)
+                'interface': ParameterValue(LaunchConfiguration("interface"), value_type=str),
+                'use_robot': ParameterValue(use_robot, value_type=bool),
+                'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
             }],
             output='screen'
         ),

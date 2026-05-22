@@ -6,6 +6,7 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.conditions import IfCondition
 from launch_ros.actions import Node
 from launch_ros.actions import PushRosNamespace
+from launch_ros.parameter_descriptions import ParameterValue
 from launch.actions import DeclareLaunchArgument
 from launch.actions import SetEnvironmentVariable
 from launch.actions import GroupAction
@@ -27,7 +28,7 @@ def generate_launch_description():
         name='MOLA_LIDAR_TOPIC', value=LaunchConfiguration('lidar_topic_name'))
     # ~~~~~~~~~~~~
     ignore_lidar_pose_from_tf_arg = DeclareLaunchArgument(
-        "ignore_lidar_pose_from_tf", default_value="true", description="If true, the LiDAR pose will be assumed to be at the origin (base_link). Set to false (default) if you want to read the actual sensor pose from /tf")
+        "ignore_lidar_pose_from_tf", default_value="false", description="If true, the LiDAR pose will be assumed to be at the origin (base_link). Set to false (default) if you want to read the actual sensor pose from /tf")
     fixed_sensorpose_env_var = SetEnvironmentVariable(
         name='MOLA_USE_FIXED_LIDAR_POSE', value=LaunchConfiguration('ignore_lidar_pose_from_tf'))
     # ~~~~~~~~~~~~
@@ -43,7 +44,14 @@ def generate_launch_description():
     # ~~~~~~~~~~~~
     use_rviz = LaunchConfiguration('use_rviz')
     use_rviz_arg = DeclareLaunchArgument(
-        "use_rviz", default_value="False", description="Whether to launch RViz2 with default lidar-odometry.rviz configuration")
+        "use_rviz", default_value="False", description="Whether to launch RViz2")
+    
+    rviz_config = LaunchConfiguration('rviz_config')
+    rviz_config_arg = DeclareLaunchArgument(
+        "rviz_config", 
+        default_value=os.path.join(myDir, 'rviz2', 'lidar-odometry.rviz'),
+        description="Path to the RViz configuration file"
+    )
     # ~~~~~~~~~~~~
     use_mola_gui_arg = DeclareLaunchArgument(
         "use_mola_gui", default_value="False", description="Whether to open MolaViz GUI interface for watching live mapping and control UI")
@@ -74,6 +82,12 @@ def generate_launch_description():
         "mola_state_estimator_reference_frame", default_value="map", description="The /tf frame name to be used as reference for MOLA State Estimators to publish pose updates")
     mola_tf_map_env_var = SetEnvironmentVariable(
         name='MOLA_TF_MAP', value=LaunchConfiguration('mola_state_estimator_reference_frame'))
+    
+    mola_tf_base_link_env_var = SetEnvironmentVariable(
+        name='MOLA_TF_BASE_LINK', value='base_footprint')
+
+    mola_tf_footprint_link_env_var = SetEnvironmentVariable(
+        name='MOLA_TF_FOOTPRINT_LINK', value='')
     # ~~~~~~~~~~~~
     mola_lo_pipeline_arg = DeclareLaunchArgument(
         "mola_lo_pipeline", default_value="/ros2_ws/src/g1pilot/pipelines/lidar3d.yaml", description="The LiDAR-Odometry pipeline configuration YAML file defining the LO system. Absolute path, or relative to 'mola-cli-launchs/lidar_odometry_ros2.yaml'. Default is the 'lidar3d-default.yaml' system described in the IJRR 2025 paper.")
@@ -95,14 +109,9 @@ def generate_launch_description():
     mola_initial_map_sm_file_env_var = SetEnvironmentVariable(
         name='MOLA_LOAD_SM', value=LaunchConfiguration('mola_initial_map_sm_file'))
     # ~~~~~~~~~~~~
-    mola_footprint_to_base_link_tf_arg = DeclareLaunchArgument(
-        "mola_footprint_to_base_link_tf", 
-        default_value="[0, 0, 0, 0, 0, 0]",
-        description="Transformation between base_footprint and pelvis."
-    )
     mola_footprint_to_base_link_tf_env_var = SetEnvironmentVariable(
         name='MOLA_TF_FOOTPRINT_TO_BASE_LINK',
-        value=LaunchConfiguration('mola_footprint_to_base_link_tf'))
+        value='[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]')
     # ~~~~~~~~~~~~
     enforce_planar_motion_arg = DeclareLaunchArgument(
         "enforce_planar_motion", default_value="False", description="Whether to enforce z, pitch, and roll to be zero.")
@@ -170,7 +179,7 @@ def generate_launch_description():
     
     mola_footprint_to_base_link_tf_arg = DeclareLaunchArgument(
         "mola_footprint_to_base_link_tf", 
-        default_value="[0, 0, 0, 0, 0, 0]",
+        default_value="[0.0, 0.0, 0.676, 0.0, 0.0, 0.0]",
         description="Transformation between base_footprint and pelvis."
     )
 
@@ -190,7 +199,7 @@ def generate_launch_description():
         description='Whether to apply a namespace to the navigation stack')
     
     disable_tf_publish_env_var = SetEnvironmentVariable(
-        name='MOLA_LOCALIZATION_PUBLISH_TF', value='False')
+        name='MOLA_LOCALIZATION_PUBLISH_TF', value='True')
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -222,6 +231,7 @@ def generate_launch_description():
             output='screen',
             remappings=tf_remaps,
             arguments=[mola_system_yaml_file],
+            parameters=[{"use_sim_time": ParameterValue(LaunchConfiguration('use_sim_time', default='false'), value_type=bool)}],
             on_exit=Shutdown()
         ),
 
@@ -232,8 +242,9 @@ def generate_launch_description():
             name='rviz2',
             remappings=tf_remaps,
             arguments=[
-                '-d', [os.path.join(myDir, 'rviz2', 'lidar-odometry.rviz')]]
-        )
+                '-d', rviz_config],
+            parameters=[{"use_sim_time": ParameterValue(LaunchConfiguration('use_sim_time', default='false'), value_type=bool)}]
+        ),
     ])
 
     return LaunchDescription([
@@ -265,7 +276,6 @@ def generate_launch_description():
         mola_initial_map_mm_file_env_var,
         mola_initial_map_sm_file_arg,
         mola_initial_map_sm_file_env_var,
-        mola_footprint_to_base_link_tf_arg,
         mola_footprint_to_base_link_tf_env_var,
         enforce_planar_motion_arg,
         enforce_planar_motion_env_var,
@@ -281,12 +291,15 @@ def generate_launch_description():
         localization_publish_tf_source_env_var,
         mola_se_reference_frame_arg,
         mola_tf_map_env_var,
+        mola_tf_base_link_env_var,
+        mola_tf_footprint_link_env_var,
         lidar_scan_validity_minimum_point_count_arg,
         lidar_scan_validity_minimum_point_env_var,
         lidar_scan_validity_enable_env_var,
         mola_precise_deskew_from_imu_arg,
         mola_precise_deskew_from_imu_env_var,
         use_rviz_arg,
+        rviz_config_arg,
         node_group,
         disable_tf_publish_env_var,
     ])

@@ -89,9 +89,11 @@ class RobotState(Node):
         self.declare_parameter('interface', '')
         self.declare_parameter('publish_joint_states', True)
 
-        self.use_robot = bool(self.get_parameter('use_robot').value)
+        use_robot_val = self.get_parameter('use_robot').value
+        self.use_robot = use_robot_val if isinstance(use_robot_val, bool) else (str(use_robot_val).lower() == 'true')
         interface = self.get_parameter('interface').get_parameter_value().string_value
-        self.publish_joint_states = bool(self.get_parameter('publish_joint_states').value)
+        pub_js_val = self.get_parameter('publish_joint_states').value
+        self.publish_joint_states = pub_js_val if isinstance(pub_js_val, bool) else (str(pub_js_val).lower() == 'true')
         self.ns = '/g1pilot'
 
         qos_profile = QoSProfile(depth=10)

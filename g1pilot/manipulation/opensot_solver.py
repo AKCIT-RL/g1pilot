@@ -95,10 +95,12 @@ class G1CollisionAvoidanceNode(Node):
         self.declare_parameter("send_cmds_to_robot", True)
         self.declare_parameter("publish_joint_states_opensot", False)
         self.interface = str(self.get_parameter("interface").value)
-        self.use_robot = bool(self.get_parameter("use_robot").value)
+        use_robot_val = self.get_parameter("use_robot").value
+        self.use_robot = use_robot_val if isinstance(use_robot_val, bool) else (str(use_robot_val).lower() == 'true')
         self.enable_collision_avoidance = bool(self.get_parameter("enable_collision_avoidance").value)
         self.send_cmds_to_robot = bool(self.get_parameter("send_cmds_to_robot").value)
-        self.publish_joint_states_opensot = bool(self.get_parameter("publish_joint_states_opensot").value)
+        pub_js_val = self.get_parameter("publish_joint_states_opensot").value
+        self.publish_joint_states_opensot = pub_js_val if isinstance(pub_js_val, bool) else (str(pub_js_val).lower() == 'true')
 
         self.control_dt = 0.005
         self.time = 0.0
@@ -336,7 +338,7 @@ class G1CollisionAvoidanceNode(Node):
         # Add 6-DOF controls
         self.add_6dof_controls(int_marker)
 
-        self.marker_enabled[name] = False
+        self.marker_enabled[name] = True
 
         menu = MenuHandler()
         h_enable = menu.insert("Enable", callback=self.process_menu)

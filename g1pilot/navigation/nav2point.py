@@ -53,7 +53,7 @@ class Nav2Point(Node):
         self.timer = self.create_timer(1.0 / self.rate, self.loop)
 
         self.have_pose = False
-        self.auto_enabled = False
+        self.auto_enabled = True
         self.path = []
         self.path_frame = self.frame_id
         self.idx = 0
@@ -75,6 +75,7 @@ class Nav2Point(Node):
         self.auto_enabled = msg.data
 
     def cb_path(self, msg: Path):
+        self.get_logger().info(f"Received new path with {len(msg.poses)} points.")
         self.path = [(p.pose.position.x, p.pose.position.y) for p in msg.poses]
         self.path_frame = msg.header.frame_id if msg.header.frame_id else self.frame_id
         self.idx = 0
@@ -115,6 +116,9 @@ class Nav2Point(Node):
 
     def loop(self):
         try:
+            if not self.auto_enabled:
+                return
+
             if (len(self.path) == 0):
                 if not self.logged_no_path:
                     self.get_logger().warn('No path available.')
@@ -195,7 +199,7 @@ class Nav2Point(Node):
             axes[1] = ax1
             axes[0] = ax0
             axes[2] = ax3
-            buttons[8] = 1
+            buttons[7] = 1
 
             joy.axes = axes
             joy.buttons = buttons

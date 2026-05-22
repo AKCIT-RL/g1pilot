@@ -15,6 +15,9 @@ from unitree_sdk2py.g1.loco.g1_loco_api import (
     ROBOT_API_ID_LOCO_GET_FSM_ID,
     ROBOT_API_ID_LOCO_GET_FSM_MODE,
 )
+from unitree_sdk2py.core.channel import ChannelPublisher
+from unitree_sdk2py.idl.std_msgs.msg.dds_ import String_
+from rclpy.qos import QoSProfile, ReliabilityPolicy
 
 
 def _rpc_get_int(client, api_id):
@@ -37,7 +40,8 @@ class G1LocoClient(Node):
         self.control_arms = False
 
         self.declare_parameter('use_robot', True)
-        self.use_robot = bool(self.get_parameter('use_robot').value)
+        use_robot_val = self.get_parameter('use_robot').value
+        self.use_robot = use_robot_val if isinstance(use_robot_val, bool) else (str(use_robot_val).lower() == 'true')
 
         self.declare_parameter('interface', '')
         interface = self.get_parameter('interface').get_parameter_value().string_value
@@ -54,7 +58,7 @@ class G1LocoClient(Node):
         )
 
         if self.use_robot:
-            ChannelFactoryInitialize(0, interface)
+            ChannelFactoryInitialize(1, interface)
             self.robot = LocoClient()
             self.robot.SetTimeout(10.0)
             self.robot.SetFsmId(4)
@@ -67,12 +71,23 @@ class G1LocoClient(Node):
             self.robot = None
             self.current_id = 4
             self.current_mode = 0
-            self.get_logger().info("use_robot:=false -> Not connecting to robot.")
+            self.get_logger().info("use_robot:=false -> Not connecting to robot. Initializing Sim Bridge.")
+            
+            # Initialize DDS Factory for Simulator
+            ChannelFactoryInitialize(0, interface)
+            
+            # Initialize Isaac Lab Sim Bridge
+            self.sim_ros_pub = self.create_publisher(String, '/run_command/cmd', 10)
+            
+            self.entering_balancing()
 
         self.create_subscription(Bool, '/g1pilot/emergency_stop', self.emergency_callback, 10)
         self.create_subscription(Bool, '/g1pilot/start', self.start_callback, 10)
         self.create_subscription(Bool, '/g1pilot/start_balancing', self.start_balancing_callback, 10)
-        self.create_subscription(Joy, '/g1pilot/joy', self.joystick_callback, 10)
+
+        joy_qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
+        self.create_subscription(Joy, '/g1pilot/joy', self.joystick_callback, joy_qos)
+        self.create_subscription(Joy, '/g1pilot/auto_joy', self.joystick_callback, joy_qos)
 
         self.publisher_arms_controlled = self.create_publisher(Bool, '/g1pilot/arms/enabled', 1)
         self.right_gripper_pub = self.create_publisher(String, '/g1pilot/dx3/hand_action/right', 1)
@@ -136,8 +151,8 @@ class G1LocoClient(Node):
             self._clear_once("_e_stop_activated_logged")
 
     def base_height_callback(self, msg: Float64):
-        # self.get_logger().warning(f"Received base height command: {msg.data}")
-        self.robot.SetStandHeight(msg.data)
+        if self.use_robot and self.robot is not None:
+            self.robot.SetStandHeight(msg.data)
 
     def start_callback(self, msg: Bool):
         if self.use_robot and self.robot is not None and msg.data:
@@ -245,12 +260,30 @@ class G1LocoClient(Node):
                 vx = round(msg.axes[1] * -0.5, 2)
                 vy = round(msg.axes[0] * -0.5, 2)
                 yaw = round(msg.axes[2] * -0.5, 2)
-                self._log_once("info", f"Moving with vx: {vx}, vy: {vy}, yaw: {yaw}", "_moving_logged")
+                
+                # Check for zero velocity stop
+                is_stop = abs(vx) < 0.03 and abs(vy) < 0.03 and abs(yaw) < 0.03
+                
                 if self.use_robot and self.robot is not None:
-                    if abs(vx) < 0.03 and abs(vy) < 0.03 and abs(yaw) < 0.03:
+                    if is_stop:
                         self.robot.StopMove()
                     else:
                         self.robot.Move(vx=vx, vy=vy, vyaw=yaw, continous_move=True)
+                else:
+                    # Simulation / Mock mode logging and Sim Bridge
+                    if is_stop:
+                        self._log_once("info", "SDK Mock: StopMove", "_mock_stop_logged")
+                        self._clear_once("_mock_move_logged")
+                        # Send stop to Sim Bridge via ROS 2
+                        if hasattr(self, 'sim_ros_pub'):
+                            self.sim_ros_pub.publish(String(data="[0.0, 0.0, 0.0, 0.8]"))
+                    else:
+                        self.get_logger().info(f"SDK Mock Move: vx={vx}, vy={vy}, yaw={yaw}", throttle_duration_sec=1.0)
+                        # Send velocity to Sim Bridge (Format: [-x, -y, -yaw, height])
+                        cmd_list = [-float(vx), -float(vy), -float(yaw), 0.8]
+                        msg_str = str(cmd_list)
+                        if hasattr(self, 'sim_ros_pub'):
+                            self.sim_ros_pub.publish(String(data=msg_str))
 
             self.prev_buttons = {i: msg.buttons[i] for i in range(len(msg.buttons))}
             self.prev_axis_last = axis_last
