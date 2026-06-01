@@ -12,12 +12,14 @@ def generate_launch_description():
     mola_map = LaunchConfiguration('mola_map')
     rviz_config = LaunchConfiguration('rviz_config')
     use_robot = LaunchConfiguration('use_robot')
+    start_mapping_enabled = LaunchConfiguration('start_mapping_enabled')
 
     # Arguments
     use_sim_time_arg = DeclareLaunchArgument('use_sim_time', default_value='false')
     mola_map_arg = DeclareLaunchArgument('mola_map', default_value='/ros2_ws/final_map.mm')
     rviz_config_arg = DeclareLaunchArgument('rviz_config', default_value='/rosbags/rviz.rviz')
     use_robot_arg = DeclareLaunchArgument('use_robot', default_value='false')
+    start_mapping_enabled_arg = DeclareLaunchArgument('start_mapping_enabled', default_value='false')
 
     # MOLA Localization
     mola_launcher = IncludeLaunchDescription(
@@ -26,7 +28,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             'use_sim_time': use_sim_time,
-            'start_mapping_enabled': 'true',
+            'start_mapping_enabled': start_mapping_enabled,
             'generate_simplemap': 'false',
             'mola_initial_map_mm_file': mola_map,
             'use_rviz': 'true',
@@ -41,8 +43,9 @@ def generate_launch_description():
         name='pcl_to_grid',
         parameters=[{
             'use_sim_time': use_sim_time,
-            'min_z': 0.8,
-            'max_z': 1.5,
+            'min_z': 0.1,
+            'max_z': 1.2,
+            'mola_map': mola_map,
         }]
     )
 
@@ -74,6 +77,7 @@ def generate_launch_description():
         mola_map_arg,
         rviz_config_arg,
         use_robot_arg,
+        start_mapping_enabled_arg,
         mola_launcher,
         pcl_to_grid,
         planner,

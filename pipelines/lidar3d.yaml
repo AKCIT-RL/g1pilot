@@ -57,7 +57,7 @@ params:
   # Adaptive threshold, as in the KISS-ICP paper:
   adaptive_threshold:
     enabled: true
-    initial_sigma: 2.0 # [m]
+    initial_sigma: 1000000.0 # [m]
     min_motion: ${MOLA_SIGMA_MIN_MOTION|0.10} # [m]
     maximum_sigma: ${MOLA_SIGMA_MAX_MOTION|3.0} # [m]
     kp: 2.0
@@ -373,6 +373,7 @@ observations_filter_final_pass:
 insert_observation_into_local_map:
   - class_name: mp2p_icp_filters::FilterMerge
     params:
+      enabled: "${MOLA_MAPPING_ENABLED|true}"
       input_pointcloud_layer: "decimated_for_map"
       target_layer: "${MOLA_LOCALMAP_LAYER_NAME|localmap}"
       input_layer_in_local_coordinates: true

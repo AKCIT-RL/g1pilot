@@ -257,9 +257,9 @@ class G1LocoClient(Node):
                     self.robot.StopMove()
 
             if msg.buttons[7] == 1 and not self.robot_stopped and self.balanced:
-                vx = round(msg.axes[1] * -0.5, 2)
-                vy = round(msg.axes[0] * -0.5, 2)
-                yaw = round(msg.axes[2] * -0.5, 2)
+                vx = round(msg.axes[1] * -1.0, 2)
+                vy = round(msg.axes[0] * -1.0, 2)
+                yaw = round(msg.axes[2] * -1.0, 2)
                 
                 # Check for zero velocity stop
                 is_stop = abs(vx) < 0.03 and abs(vy) < 0.03 and abs(yaw) < 0.03
@@ -280,7 +280,7 @@ class G1LocoClient(Node):
                     else:
                         self.get_logger().info(f"SDK Mock Move: vx={vx}, vy={vy}, yaw={yaw}", throttle_duration_sec=1.0)
                         # Send velocity to Sim Bridge (Format: [-x, -y, -yaw, height])
-                        cmd_list = [-float(vx), -float(vy), -float(yaw), 0.8]
+                        cmd_list = [float(vx), float(vy), float(yaw), 0.8]
                         msg_str = str(cmd_list)
                         if hasattr(self, 'sim_ros_pub'):
                             self.sim_ros_pub.publish(String(data=msg_str))

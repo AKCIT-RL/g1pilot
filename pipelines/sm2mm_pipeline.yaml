@@ -8,17 +8,7 @@ generators:
       throw_on_unhandled_observation_class: false
 
       metric_map_definition:
-        class: mola::HashedVoxelPointCloud
-        plugin: "libmola_metric_maps.so"
-        creationOpts:
-          voxel_size: 0.5
-        insertOpts:
-          max_points_per_voxel: 20
-          min_distance_between_points: 0
-        likelihoodOpts:
-          sigma_dist: 1.0
-          max_corr_distance: 2.0
-          decimation: 10
+        class: mrpt::maps::CSimplePointsMap
 
   # Load all observations into a plain point cloud layer "raw"
   - class_name: mp2p_icp_filters::Generator
