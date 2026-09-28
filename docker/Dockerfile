@@ -50,8 +50,9 @@ RUN git clone https://github.com/humanoid-path-planner/hpp-fcl.git && \
 
 ## PINOCCHIO
 WORKDIR /home/forest_ws/src
-RUN git clone -b devel https://github.com/stack-of-tasks/pinocchio.git && \
+RUN git clone https://github.com/stack-of-tasks/pinocchio.git && \
     cd /home/forest_ws/src/pinocchio && \
+    git checkout v3.9.0 && \
     git submodule init && \
     git submodule update && \
     mkdir -p /home/forest_ws/build/pinocchio && \
@@ -70,7 +71,7 @@ RUN git clone -b devel https://github.com/ADVRHumanoids/xbot2_interface.git && \
     cd /home/forest_ws/build/xbot2_interface && \
     source /opt/ros/jazzy/setup.bash && \
     source /home/forest_ws/setup.bash && \
-    cmake -DXBOT2_IFC_BUILD_TESTS=ON -DXBOT2_IFC_BUILD_ROS=OFF -DXBOT2_IFC_BUILD_ROS2=OFF -DCMAKE_INSTALL_PREFIX:STRING=/home/forest_ws/install -DCMAKE_BUILD_TYPE:STRING=Release ../../src/xbot2_interface && \
+    cmake -DXBOT2_IFC_BUILD_TESTS=ON -DXBOT2_IFC_BUILD_ROS=OFF -DXBOT2_IFC_BUILD_ROS2=OFF -DBoost_NO_BOOST_CMAKE=ON -DBoost_USE_DEBUG_RUNTIME=OFF -DBoost_USE_STATIC_LIBS=OFF -DCMAKE_INSTALL_PREFIX:STRING=/home/forest_ws/install -DCMAKE_BUILD_TYPE:STRING=Release ../../src/xbot2_interface && \
     make -j8 && \
     make install
 
@@ -364,8 +365,14 @@ RUN rm -f package.xml && \
 RUN rm -rf /ros2_ws/src/unitree_ros2/cyclonedds_ws/src/unitree
 
 WORKDIR /ros2_ws
+# livox_ros_driver2 is already treated as opt-in everywhere else (cbuild's own
+# DEFAULT_SKIP_PKGS skips it unless BUILD_LIVOX=1, and it's only needed for real Livox hardware,
+# not the Isaac Sim /livox/lidar simulation this image is normally run against) -- and its
+# CMakeLists.txt currently depends on a rosidl target-property timing behavior that newer rosidl
+# versions (pulled in fresh by apt-get upgrade above) no longer provide, breaking this build.
+# Match cbuild's precedent and skip it here too rather than patching a third-party CMake bug.
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
-    /home/.base/bin/python3 -m colcon build --cmake-args -DROS_EDITION=ROS2 -DHUMBLE_ROS=humble
+    /home/.base/bin/python3 -m colcon build --cmake-args -DROS_EDITION=ROS2 -DHUMBLE_ROS=humble --packages-skip livox_ros_driver2
 
 RUN pip install pyqt6 pin meshcat evdev
 RUN apt-get update && apt-get install -y \

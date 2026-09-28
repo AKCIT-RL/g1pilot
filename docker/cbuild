@@ -36,7 +36,7 @@ has_token() {
 }
 
 if [ "$#" -eq 0 ]; then
-  clean_pkgs unitree_api unitree_go unitree_hg unitree_sdk2py
+  clean_pkgs unitree_api unitree_go unitree_hg unitree_sdk2py astroviz_interfaces
 
   if [ "${BUILD_LIVOX:-0}" = "1" ]; then
     clean_pkgs livox_ros_driver2
@@ -51,7 +51,7 @@ fi
 
 if [ "$1" = "all" ]; then
   shift
-  clean_pkgs unitree_api unitree_go unitree_hg unitree_sdk2py livox_ros_driver2
+  clean_pkgs unitree_api unitree_go unitree_hg unitree_sdk2py livox_ros_driver2 astroviz_interfaces
   /home/.base/bin/python3 -m colcon build --symlink-install --executor parallel --parallel-workers 4
   exit 0
 fi

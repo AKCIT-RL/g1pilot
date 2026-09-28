@@ -20,6 +20,17 @@ flowchart LR
 
 To maintain absolute reproducibility, the workspace executes inside a pre-configured Docker container.
 
+**If this repo is checked out as a submodule of the main simulation repo** (`industrial_hum`),
+its own `docker-compose.yaml` already defines a `g1pilot` service that does everything below
+automatically -- build, `cbuild g1pilot`, source the workspace, and `ros2 launch
+mission_launcher.launch.py` -- and waits for the simulation (`g1` service) to finish spawning
+and stabilizing before it starts. From the main repo's root:
+```bash
+docker compose up g1 g1pilot
+```
+See its own README for details. The manual steps below are for running this package standalone,
+or against the real robot.
+
 1. **Navigate to the docker directory and launch the container:**
    ```bash
    cd src/g1pilot/docker
@@ -77,14 +88,22 @@ sm-cli info /ros2_ws/final_map.simplemap
 
 The raw `.simplemap` file is highly detailed but memory-heavy for direct navigation. We convert it into a streamlined, voxelized **Metric Map (`.mm`)** that acts as the global environment layout.
 
-Run the metric generator utilizing our custom decimation pipeline:
+Run the metric generator utilizing our custom decimation pipeline. `cd` into `g1pilot/` first so
+the output lands directly in the bind-mounted package directory (persisted on the host, unlike
+`/ros2_ws` itself) -- right where `mission_launcher.launch.py`'s `mola_map` default expects it,
+with no extra copy/move step:
 
 ```bash
+cd /ros2_ws/src/g1pilot
 /opt/ros/jazzy/bin/sm2mm \
-  --input final_map.simplemap \
+  --input /ros2_ws/final_map.simplemap \
   --pipeline /ros2_ws/src/g1pilot/pipelines/sm2mm_pipeline.yaml \
   --output final_map.mm
 ```
+
+> If you also want the raw `.simplemap` to persist (e.g. to reprocess it later, or to feed
+> `mola_initial_map_sm_file` to continue mapping from it), copy it into `g1pilot/` too:
+> `cp /ros2_ws/final_map.simplemap /ros2_ws/src/g1pilot/final_map.simplemap`
 
 > **What does the pipeline (`sm2mm_pipeline.yaml`) do?**
    > * Reads the accumulated SLAM point cloud keyframes.
@@ -98,7 +117,7 @@ Run the metric generator utilizing our custom decimation pipeline:
 To double-check the compiled geometry of the environment prior to navigation, you can inspect the `.mm` file in 3D:
 
 ```bash
-mm-viewer /ros2_ws/final_map.mm
+mm-viewer /ros2_ws/src/g1pilot/final_map.mm
 ```
 * *A 3D OpenGL window will open, letting you pan and inspect the converted mesh.*
 
@@ -110,11 +129,12 @@ Once the metric map (`final_map.mm`) is ready, you can deploy autonomous goal-di
 
 1. **Launch the master autonomous mission controller:**
    ```bash
-   ros2 launch g1pilot mission_launcher.launch.py mola_map:=/ros2_ws/final_map.mm
+   ros2 launch g1pilot mission_launcher.launch.py mola_map:=/ros2_ws/src/g1pilot/final_map.mm
    ```
    
    > **Parameter breakdown:**
-   > * `mola_map:=/ros2_ws/final_map.mm`: Path to the voxelized metric map file.
+   > * `mola_map:=/ros2_ws/src/g1pilot/final_map.mm`: Path to the voxelized metric map file. This is also
+   >   the argument's own default, so it can be omitted if the map lives there.
 
 2. **Under the Hood Pipeline:**
    * **MOLA Localization:** Dynamically tracks G1's position within the global metric map layout (`.mm`).
@@ -129,6 +149,36 @@ Once the metric map (`final_map.mm`) is ready, you can deploy autonomous goal-di
 
 ---
 
+## Phase 7: Extra Navigation Features
+
+* **Tuning file:** every `dijkstra_planner`/`nav2point` parameter mentioned below (PID gains,
+  tolerances, recovery timing, the geofence polygon, the home pose, ...) lives in
+  [`nav.yaml`](nav.yaml) -- edit it and relaunch, no rebuild needed.
+
+* **Go home:** call `/g1pilot/go_home` (`std_srvs/Trigger`, no request fields) to send the robot
+  to a fixed pose (`home_x`/`home_y`/`home_yaw_deg` in `nav.yaml`):
+  ```bash
+  ros2 service call /g1pilot/go_home std_srvs/srv/Trigger
+  ```
+
+* **Geofence:** set `geofence_points` in `nav.yaml` to a flat `[x1,y1,x2,y2,...]` polygon
+  (capture corners with RViz's "Publish Point" tool + `ros2 topic echo /clicked_point`, in
+  perimeter order). As soon as the robot's position falls outside it, `/g1pilot/go_home` is
+  triggered automatically, and retried (`geofence_resend_interval_s`) until a mission back home
+  is actually under way. Leave the list empty (the default) to disable it.
+
+* **Robot pose topic:** `/g1pilot/robot_pose` (`geometry_msgs/PoseStamped`) republishes the
+  robot's current pose at a steady rate (`pose_publish_rate_hz` in `nav.yaml`), independent of
+  MOLA's own native odometry rate.
+
+* **Quieter logs:** `dijkstra_planner`'s per-tick path-check logging (several lines every
+  `check_rate` Hz) is off by default -- every log call also publishes to `/rosout` over DDS, so
+  this cuts real network traffic too, not just terminal noise. Set `debug: true` in `nav.yaml`
+  to bring it back; state-change logs (goal reached, blockage, replanning, recovery) always stay
+  on regardless.
+
+---
+
 ## Command Summary (Cheat Sheet)
 
 ```bash
@@ -139,15 +189,15 @@ cd src/g1pilot/docker && sh run.sh
 # SLAM Mapping
 ros2 launch g1pilot mola_launcher.launch.py use_rviz:=True generate_simplemap:=True
 
-# Read Simplemap Info
+# Read Simplemap Info (freshly generated, still in /ros2_ws -- not persisted yet)
 sm-cli info /ros2_ws/final_map.simplemap
 
-# Convert Simplemap to Metric Map
-/opt/ros/jazzy/bin/sm2mm --input final_map.simplemap --pipeline /ros2_ws/src/g1pilot/pipelines/sm2mm_pipeline.yaml --output final_map.mm
+# Convert Simplemap to Metric Map (cd first so the .mm output lands in the persisted g1pilot/ dir)
+cd /ros2_ws/src/g1pilot && /opt/ros/jazzy/bin/sm2mm --input /ros2_ws/final_map.simplemap --pipeline pipelines/sm2mm_pipeline.yaml --output final_map.mm
 
 # Visualize Metric Map
-mm-viewer /ros2_ws/final_map.mm
+mm-viewer /ros2_ws/src/g1pilot/final_map.mm
 
 # Run Autonomous Navigation
-ros2 launch g1pilot mission_launcher.launch.py mola_map:=/ros2_ws/final_map.mm
+ros2 launch g1pilot mission_launcher.launch.py mola_map:=/ros2_ws/src/g1pilot/final_map.mm
 ```

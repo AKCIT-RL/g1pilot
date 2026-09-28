@@ -1,0 +1,62 @@
+nav2point:
+  ros__parameters:
+    vx_limit: 0.3   # forward/backward, m/s
+    vy_limit: 0.0   # lateral, m/s
+    wz_limit: 0.5   # angular velocity (rad/s)
+
+    # Position PID (world frame), used while driving toward a waypoint.
+    pos_kp: 0.8
+    pos_ki: 0.05
+    pos_kd: 0.15
+    pos_integral_limit: 0.3   # bounds the accumulator itself
+
+    # Heading PID for normal waypoint tracking (aligning + steering).
+    yaw_kp: 1.5
+    yaw_ki: 0.1
+    yaw_kd: 0.1
+    yaw_integral_limit: 0.3
+
+    # Separate, gentler heading PID used only for the final orientation fix-up.
+    final_wz_limit: 0.3
+    final_yaw_kp: 0.8
+    final_yaw_ki: 0.05
+    final_yaw_kd: 0.05
+    final_yaw_integral_limit: 0.3
+
+    align_enter_deg: 20.0   # heading error to start rotating in place
+    align_exit_deg: 8.0     # heading error to resume driving
+
+    goal_tolerance: 0.20    # position tolerance to the goal, meters -- must match dijkstra_planner's below
+
+dijkstra_planner:
+  ros__parameters:
+    goal_orientation_tolerance_deg: 8.0  # heading tolerance before the mission counts as done
+    goal_tolerance: 0.20          # position tolerance to the final waypoint, meters
+    inflation_radius_m: 0.60      # safety margin added around obstacles when planning
+
+    check_horizon_dist: 1.0    # meters ahead checked for a blocking obstacle
+    check_start_dist: 0.15     # safety margin behind the robot where the check starts
+
+    recovery_sleep_duration: 3.0   # seconds between recovery attempts after a failed replan
+    max_recovery_attempts: 3       # attempts before giving up on the active goal
+
+    shortcut_check_interval_s: 5.0        # how often to look for a shorter path
+    shortcut_min_improvement_pct: 15.0    # min improvement to switch to it
+
+    debug: false    # verbose per-tick path-check logging
+
+    # Fixed pose /g1pilot/go_home sends the robot to -- capture with RViz's "2D Goal Pose" tool.
+    home_x: -1.7422828674316406
+    home_y: -0.6650495529174805
+    home_yaw_deg: 99.99
+
+    # Geofence polygon, flat [x1,y1,x2,y2,...] in perimeter order -- capture with RViz's
+    # "Publish Point" tool. Empty disables the check.
+    geofence_points: [3.747044563293457, 3.8312361240386963,
+                       4.558270454406738, -1.3783385753631592,
+                       -3.5771193504333496, -3.1787784099578857,
+                       -4.2629876136779785, 0.6592509746551514]
+    geofence_check_interval_s: 1.0    # seconds between checks
+    geofence_resend_interval_s: 5.0   # retry interval once outside the geofence
+
+    pose_publish_rate_hz: 10.0   # Hz for /g1pilot/robot_pose

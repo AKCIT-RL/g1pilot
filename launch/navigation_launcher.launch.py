@@ -15,6 +15,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     arm_controlled = LaunchConfiguration("arm_controlled")
     enable_arm_ui = LaunchConfiguration("enable_arm_ui")
+    nav_config = LaunchConfiguration("nav_config")
 
     return LaunchDescription([
         DeclareLaunchArgument("interface", default_value=EnvironmentVariable("G1_INTERFACE")),
@@ -22,6 +23,7 @@ def generate_launch_description():
         DeclareLaunchArgument("use_sim_time", default_value="false"),
         DeclareLaunchArgument("arm_controlled", default_value="both"),
         DeclareLaunchArgument("enable_arm_ui", default_value="true"),
+        DeclareLaunchArgument("nav_config", default_value="/ros2_ws/src/g1pilot/nav.yaml"),
 
         Node(
             package='g1pilot',
@@ -45,7 +47,7 @@ def generate_launch_description():
                 'interface': interface,
                 'use_robot': ParameterValue(use_robot, value_type=bool),
                 'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
-            }],
+            }, nav_config],
             remappings=[
                 ('/lidar_odometry/pose_fixed', '/lidar_odometry/pose'),
             ],
