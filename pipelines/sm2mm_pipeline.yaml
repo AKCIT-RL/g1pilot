@@ -1,5 +1,4 @@
 generators:
-  # Create the output metric map (HashedVoxelPointCloud) without processing observations
   - class_name: mp2p_icp_filters::Generator
     params:
       target_layer: "localmap"
@@ -8,7 +7,17 @@ generators:
       throw_on_unhandled_observation_class: false
 
       metric_map_definition:
-        class: mrpt::maps::CSimplePointsMap
+        class: mola::KeyframePointCloudMap
+        plugin: "libmola_metric_maps.so"
+        creationOpts:
+          k_correspondences_for_cov: 20
+          min_correspondences_for_cov: 5
+          max_distance_for_cov: 2.0
+          max_search_keyframes: 8 
+          use_view_direction_filter: false
+          max_view_angle_deg: 120
+          rotation_distance_weight: 2.0
+          num_diverse_keyframes: 1
 
   # Load all observations into a plain point cloud layer "raw"
   - class_name: mp2p_icp_filters::Generator
@@ -27,7 +36,7 @@ filters:
       voxel_filter_resolution: 0.20
       decimate_method: DecimateMethod::FirstPoint
 
-  # Merge decimated points into the voxel localmap
+  # Merge decimated points into the localmap
   - class_name: mp2p_icp_filters::FilterMerge
     params:
       input_pointcloud_layer: "decimated"

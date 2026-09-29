@@ -3,11 +3,12 @@ import math, heapq
 from collections import deque
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile
+from rclpy.qos import QoSProfile, DurabilityPolicy
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
-from geometry_msgs.msg import PointStamped, PoseStamped
+from geometry_msgs.msg import Point, PointStamped, PoseStamped
 from std_msgs.msg import Header, Bool
 from std_srvs.srv import Trigger
+from visualization_msgs.msg import Marker
 from rclpy.duration import Duration
 
 def _dist(a,b):
@@ -133,6 +134,10 @@ class DijkstraPlanner(Node):
         )
         self.srv_go_home = self.create_service(Trigger, '/g1pilot/go_home', self.cb_go_home)
         self.pub_robot_pose = self.create_publisher(PoseStamped, '/g1pilot/robot_pose', qos)
+        self.pub_geofence_marker = self.create_publisher(
+            Marker, '/g1pilot/geofence_marker',
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        )
 
         self.timer = self.create_timer(
             1.0 / self.get_parameter('check_rate').value,
@@ -159,6 +164,8 @@ class DijkstraPlanner(Node):
         self.inf_radius_cells=0
         self.have_pose=False
         self.px=self.py=self.pyaw=0.0
+
+        self.publish_geofence_marker()
 
     def cb_map(self,msg):
         """
@@ -353,6 +360,34 @@ class DijkstraPlanner(Node):
             return
         self.get_logger().warn(f"Robot outside the geofence at ({self.px:.2f}, {self.py:.2f}) -- sending it home.")
         self.send_robot_home()
+
+    def publish_geofence_marker(self):
+        """
+            Publishes the geofence polygon as a closed line strip on /g1pilot/geofence_marker, so
+            it's visible in RViz. Published once with TRANSIENT_LOCAL durability, straight from the
+            geofence_points parameter -- any late-joining RViz still gets it, and there's no separate
+            copy of the polygon to keep in sync with check_geofence.
+        """
+        pts_flat = self.get_parameter('geofence_points').value
+        if not pts_flat or len(pts_flat) < 6:
+            return
+        poly = [(pts_flat[i], pts_flat[i + 1]) for i in range(0, len(pts_flat) - 1, 2)]
+        marker = Marker()
+        marker.header.frame_id = self.map_frame
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = 'geofence'
+        marker.id = 0
+        marker.type = Marker.LINE_STRIP
+        marker.action = Marker.ADD
+        marker.pose.orientation.w = 1.0
+        marker.scale.x = 0.05
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        marker.color.a = 1.0
+        for x, y in poly + [poly[0]]:
+            marker.points.append(Point(x=x, y=y, z=0.05))
+        self.pub_geofence_marker.publish(marker)
 
     def publish_robot_pose(self):
         """

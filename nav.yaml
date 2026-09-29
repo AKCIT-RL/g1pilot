@@ -45,18 +45,25 @@ dijkstra_planner:
 
     debug: false    # verbose per-tick path-check logging
 
-    # Fixed pose /g1pilot/go_home sends the robot to -- capture with RViz's "2D Goal Pose" tool.
-    home_x: -1.7422828674316406
-    home_y: -0.6650495529174805
-    home_yaw_deg: 99.99
+    home_x: -1.7658712809264392
+    home_y: -0.9606552024251439
+    home_yaw_deg: 115.92385811133641
 
     # Geofence polygon, flat [x1,y1,x2,y2,...] in perimeter order -- capture with RViz's
     # "Publish Point" tool. Empty disables the check.
-    geofence_points: [3.747044563293457, 3.8312361240386963,
-                       4.558270454406738, -1.3783385753631592,
-                       -3.5771193504333496, -3.1787784099578857,
-                       -4.2629876136779785, 0.6592509746551514]
+    geofence_points: [2.4, 1.5,
+                       2.8, -0.8,
+                       -3.5, -2.0,
+                       -3.8, 0.2]
     geofence_check_interval_s: 1.0    # seconds between checks
     geofence_resend_interval_s: 5.0   # retry interval once outside the geofence
 
     pose_publish_rate_hz: 10.0   # Hz for /g1pilot/robot_pose
+
+pcl_to_grid:
+  ros__parameters:
+    relocalize_x: -1.766
+    relocalize_y: -0.961
+    relocalize_yaw_deg: 115.924
+    relocalize_range_m: 2.0         # 1-sigma position search radius, meters
+    relocalize_yaw_range_deg: 15.0  # 1-sigma yaw search range, degrees

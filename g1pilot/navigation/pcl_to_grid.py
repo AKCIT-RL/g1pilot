@@ -30,9 +30,11 @@ class PclToGridNode(Node):
         self.declare_parameter('min_points_per_cell', 3)      # min points to count as obstacle
         self.declare_parameter('min_obstacle_height', 0.08)   # min vertical extent per cell
         self.declare_parameter('auto_relocalize', True)
-        self.declare_parameter('relocalize_x', 0.0)
-        self.declare_parameter('relocalize_y', 0.0)
-        self.declare_parameter('relocalize_yaw_deg', 0.0)
+        self.declare_parameter('relocalize_x', 0.0)               # x of the pose to relocalize near
+        self.declare_parameter('relocalize_y', 0.0)               # y of the pose to relocalize near
+        self.declare_parameter('relocalize_yaw_deg', 0.0)         # yaw of the pose to relocalize near
+        self.declare_parameter('relocalize_range_m', 5.0)         # 1-sigma position search radius, meters
+        self.declare_parameter('relocalize_yaw_range_deg', 20.0)  # 1-sigma yaw search range, degrees
 
         self.res = self.get_parameter('resolution').value
         self.w_m = self.get_parameter('width_m').value
@@ -98,7 +100,12 @@ class PclToGridNode(Node):
     def _try_auto_relocalize(self):
         """
             Retries on a timer until /relocalize_near_pose is available, then calls it once with
-            the configured relocalize_x/y/yaw_deg pose.
+            the configured relocalize_x/y/yaw_deg pose. Position and yaw get independent search
+            ranges (relocalize_range_m, relocalize_yaw_range_deg): position uncertainty is
+            usually much larger than orientation uncertainty (we generally know roughly which
+            way the robot is facing even when we don't know exactly where it is), and a
+            needlessly wide yaw search lets ICP lock onto a flipped/rotated match in a
+            symmetric-looking aisle just as easily as the right one.
         """
         if self._relocalize_sent:
             self.relocalize_timer.cancel()
@@ -109,6 +116,9 @@ class PclToGridNode(Node):
         x = self.get_parameter('relocalize_x').value
         y = self.get_parameter('relocalize_y').value
         yaw = math.radians(self.get_parameter('relocalize_yaw_deg').value)
+        range_m = self.get_parameter('relocalize_range_m').value
+        yaw_range = math.radians(self.get_parameter('relocalize_yaw_range_deg').value)
+
         req = RelocalizeNearPose.Request()
         req.pose.header.frame_id = 'map'
         req.pose.header.stamp = self.get_clock().now().to_msg()
@@ -116,8 +126,15 @@ class PclToGridNode(Node):
         req.pose.pose.pose.position.y = y
         req.pose.pose.pose.orientation.z = math.sin(yaw / 2.0)
         req.pose.pose.pose.orientation.w = math.cos(yaw / 2.0)
-        req.pose.pose.covariance = [1.0 if i % 7 == 0 else 0.0 for i in range(36)]  # generous search radius
-        self.get_logger().info(f"Auto-relocalizing near ({x:.2f}, {y:.2f}, yaw={math.degrees(yaw):.1f} deg).")
+        cov = [0.0] * 36
+        cov[0] = cov[7] = cov[14] = range_m ** 2           # x, y, z position variance
+        cov[21] = cov[28] = math.radians(5.0) ** 2         # roll, pitch variance -- robot is on flat ground
+        cov[35] = yaw_range ** 2                           # yaw variance
+        req.pose.pose.covariance = cov
+        self.get_logger().info(
+            f"Auto-relocalizing near ({x:.2f}, {y:.2f}, yaw={math.degrees(yaw):.1f} deg), "
+            f"range={range_m:.1f}m, yaw_range={math.degrees(yaw_range):.1f}deg."
+        )
         self.relocalize_client.call_async(req)
         self._relocalize_sent = True
 
@@ -302,27 +319,27 @@ class PclToGridNode(Node):
         """
         curr_x = msg.pose.pose.position.x
         curr_y = msg.pose.pose.position.y
-        
+
         # Check MOLA pose covariance to detect localization
         # msg.pose.covariance is a 36-element array representing a 6x6 covariance matrix
         cov_x = msg.pose.covariance[0]
         cov_y = msg.pose.covariance[7]
         std_x = np.sqrt(max(0.0, cov_x))
         std_y = np.sqrt(max(0.0, cov_y))
-        
+
         # If the position uncertainty is below 1.0 meter, we are localized!
         if not self.localized:
             if std_x < 1.0 and std_y < 1.0:
                 self.localized = True
                 self.get_logger().info(f"Robot localized automatically! Covariance drops below 1.0m (std_x={std_x:.3f}m, std_y={std_y:.3f}m). Activating static millimeter map.")
-        
+
         if not hasattr(self, 'start_x'):
             self.start_x = curr_x
             self.start_y = curr_y
             self.prev_x = curr_x
             self.prev_y = curr_y
             return
-            
+
         # Detect teleportation (e.g. 2D Pose Estimate or relocalization convergence)
         dist_from_prev = np.hypot(curr_x - self.prev_x, curr_y - self.prev_y)
         if dist_from_prev > 1.0:
@@ -332,10 +349,10 @@ class PclToGridNode(Node):
             if not self.mola_map_path:
                 self.static_map_locked = False
             self.localized = True
-            
+
         self.prev_x = curr_x
         self.prev_y = curr_y
-        
+
         # Check if robot has moved away from the start position
         if not self.static_map_locked and not self.mola_map_path:
             dist_from_start = np.hypot(curr_x - self.start_x, curr_y - self.start_y)
@@ -361,7 +378,7 @@ class PclToGridNode(Node):
                 return
             
             pts_sensor = np.array(pts_list, dtype=np.float32)
-            
+
             # Look up transform from sensor frame to 'map'
             try:
                 trans = self.tf_buffer.lookup_transform('map', msg.header.frame_id, rclpy.time.Time())

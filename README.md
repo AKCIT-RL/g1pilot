@@ -107,8 +107,11 @@ cd /ros2_ws/src/g1pilot
 
 > **What does the pipeline (`sm2mm_pipeline.yaml`) do?**
    > * Reads the accumulated SLAM point cloud keyframes.
-   > * Performs voxel decimation at a resolution of `0.20m`, weeding out point clouds noise.
-   > * Merges the optimized points into a voxel map layer (`HashedVoxelPointCloud`), generating a clean collision layout for G1.
+   > * Performs voxel decimation at a resolution of `0.20m`, weeding out point cloud noise.
+   > * Merges the optimized points into a `mola::KeyframePointCloudMap` layer.
+   >   Also bakes in the `creationOpts` (wider `max_search_keyframes`, no view-angle filter) that
+   >   keep the matched keyframe set from flip-flopping as the robot moves, confirmed live to fix a
+   >   ~0.6-0.7m pose jitter that otherwise showed up both standing still and walking.
 
 ---
 
@@ -151,12 +154,19 @@ Once the metric map (`final_map.mm`) is ready, you can deploy autonomous goal-di
 
 ## Phase 7: Extra Navigation Features
 
-* **Tuning file:** every `dijkstra_planner`/`nav2point` parameter mentioned below (PID gains,
-  tolerances, recovery timing, the geofence polygon, the home pose, ...) lives in
-  [`nav.yaml`](nav.yaml) -- edit it and relaunch, no rebuild needed.
+* **Tuning file:** every `dijkstra_planner`/`nav2point`/`pcl_to_grid` parameter mentioned below
+  (PID gains, tolerances, recovery timing, the geofence polygon, the home pose, relocalization
+  search range, ...) lives in [`nav.yaml`](nav.yaml) -- edit it and relaunch, no rebuild needed.
 
 * **Go home:** call `/g1pilot/go_home` (`std_srvs/Trigger`, no request fields) to send the robot
-  to a fixed pose (`home_x`/`home_y`/`home_yaw_deg` in `nav.yaml`):
+  to a fixed pose (`home_x`/`home_y`/`home_yaw_deg` in `nav.yaml`). That same pose is reused to
+  seed MOLA's own startup localization (`pcl_to_grid`'s `relocalize_x/y/yaw_deg`, and
+  `mission_launcher.launch.py` reads it into `MOLA_INITIAL_X/Y/YAW` too) -- confirmed live that
+  seeding at the map's coordinate origin instead (MOLA's own default) made ICP struggle from the
+  very first scan, since the robot doesn't actually spawn there. Recapture with RViz's "2D Goal
+  Pose" tool if the spawn point ever changes, and update `home_x/y/yaw_deg` in `nav.yaml`
+  (`relocalize_x/y/yaw_deg` under `pcl_to_grid:` too -- can't be a YAML anchor, ROS2's own
+  `--params-file` parser rejects anchors/aliases):
   ```bash
   ros2 service call /g1pilot/go_home std_srvs/srv/Trigger
   ```
